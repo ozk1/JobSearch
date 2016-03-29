@@ -273,8 +273,12 @@ namespace WindowsFormsApplication1
             }
 
             // 詳細ページから内容取得
+            int iCnt = 0;
             foreach (string page in DetailPageList)
             {
+                label1.Text = string.Format("{0}/{1}", ++iCnt, DetailPageList.Count);
+                Application.DoEvents();
+
                 if (page.Trim() == "")
                 {
                     continue;
@@ -299,7 +303,7 @@ namespace WindowsFormsApplication1
                 }
 
                 // 少し待つ
-                System.Threading.Thread.Sleep(100);
+                System.Threading.Thread.Sleep(10);
             }
             ConvertDataTableToCsv(TempTable, @"D:\test2.csv", true);
         }
