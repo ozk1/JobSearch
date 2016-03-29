@@ -253,6 +253,147 @@ namespace WindowsFormsApplication1
 
         #endregion
 
+        #region // インテリジェンスの派遣 //
+        private void button3_Click(object sender, EventArgs e)
+        {
+            // リンク取得
+            string strValue = textBox1.Text.Replace("\r\n", "\n");
+            List<string> LinkList = new List<string>(strValue.Split('\n'));
+
+            // リンクから詳細ページリスト取得
+            DataTable TempTable = new DataTable();
+            List<string> DetailPageList = new List<string>();
+            foreach (string link in LinkList)
+            {
+                if (link.Trim() == "")
+                {
+                    continue;
+                }
+                DetailPageList.AddRange(GetInList(link));
+            }
+
+            // 詳細ページから内容取得
+            foreach (string page in DetailPageList)
+            {
+                if (page.Trim() == "")
+                {
+                    continue;
+                }
+
+                var InfoDict = GetInDetail(page);
+
+                // カラムが無かったら追加
+                foreach (string Col in InfoDict.Keys)
+                {
+                    if (TempTable.Columns.Contains(Col) == false)
+                    {
+                        TempTable.Columns.Add(Col, typeof(string));
+                    }
+                }
+
+                // 1行追加
+                var AddRow = TempTable.Rows.Add();
+                foreach (string Col in InfoDict.Keys)
+                {
+                    AddRow[Col] = InfoDict[Col];
+                }
+
+                // 少し待つ
+                System.Threading.Thread.Sleep(100);
+            }
+            ConvertDataTableToCsv(TempTable, @"D:\test2.csv", true);
+        }
+
+        private List<string> GetInList(string Url)
+        {
+            List<string> RetList = new List<string>();
+            try
+            {
+                WebClient webclient = new WebClient();
+                webclient.Encoding = Encoding.UTF8;
+                string htmlText = webclient.DownloadString(Url);
+
+                if (htmlText != null)
+                {
+                    // HtmlDocumentオブジェクトを構築する
+                    var htmlDoc = new HtmlAgilityPack.HtmlDocument();
+                    htmlDoc.LoadHtml(htmlText);
+
+                    var nodes = htmlDoc.DocumentNode.SelectNodes("//a");
+                    foreach (HtmlNode node in nodes)
+                    {
+                        if (node.InnerText == "…詳細へ")
+                        {
+                            //node.OuterHtml
+                            // "<a href=\"javascript:void(0)\" onclick=\"javascript:goListToDetail('/jobsearch/workDetail_index.html?job_offer_id=I-E160356197-IT')\" class=\"readMore\">…詳細へ</a>"
+                            if(node.OuterHtml.Contains("('") && node.OuterHtml.Contains("')"))
+                            {
+                                int iS = node.OuterHtml.IndexOf("('") +2;
+                                int iE = node.OuterHtml.IndexOf("')");
+                                RetList.Add(string.Format("https://haken.inte.co.jp{0}", node.OuterHtml.Substring(iS, iE - iS)));
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex.Message);
+            }
+            return RetList;
+        }
+
+        private Dictionary<string, string> GetInDetail(string Url)
+        {
+            Dictionary<string, string> RetDict = new Dictionary<string, string>();
+            try
+            {
+                WebClient webclient = new WebClient();
+                webclient.Encoding = Encoding.UTF8;
+                string htmlText = webclient.DownloadString(Url);
+
+                if (htmlText != null)
+                {
+                    // HtmlDocumentオブジェクトを構築する
+                    var htmlDoc = new HtmlAgilityPack.HtmlDocument();
+                    htmlDoc.LoadHtml(htmlText);
+                    
+                    var h3nodes = htmlDoc.DocumentNode.SelectNodes("//h3");
+                    foreach (HtmlNode node in h3nodes)
+                    {
+                        RetDict["タイトル"] = TrimEx(node.InnerText).Replace("<!-- --><!-- --><!-- --><!-- -->", "");
+                        break;
+                    }
+
+                    var nodes = htmlDoc.DocumentNode.SelectNodes("//tr");
+                    foreach (HtmlNode node in nodes)
+                    {
+                        string Title = "";
+                        string Value = "";
+                        foreach (HtmlNode childnode in node.ChildNodes)
+                        {
+                            if (childnode.Name == "th")
+                            {
+                                Title = TrimEx(childnode.InnerText);
+                                System.Diagnostics.Trace.WriteLine(Title);
+                            }
+                            else
+                            {
+                                Value += TrimEx(childnode.InnerText);
+                            }
+                        }
+                        RetDict[Title] = HttpUtility.HtmlDecode(Value);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Trace.WriteLine(ex.Message);
+            }
+            return RetDict;
+        }
+        #endregion
+
         #region // DataTable2CSV //
         /// <summary>
         /// DataTableの内容をCSVファイルに保存する
@@ -359,10 +500,5 @@ namespace WindowsFormsApplication1
                 field.EndsWith("\t");
         }
         #endregion
-
-        private void button3_Click(object sender, EventArgs e)
-        {
-
-        }
     }
 }
